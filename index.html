@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0"
+  >
+
+  <title>Escáner QR SCD</title>
+
+  <script
+    src="https://unpkg.com/html5-qrcode"
+    type="text/javascript">
+  </script>
+
+  <style>
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      background: #f4f6f9;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #222;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+      margin: 0 auto;
+      padding: 18px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    }
+
+    h1 {
+      margin: 0 0 8px 0;
+      text-align: center;
+      font-size: 24px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #666;
+      font-size: 15px;
+      line-height: 1.4;
+      margin-bottom: 20px;
+    }
+
+    #qr-reader {
+      width: 100%;
+      overflow: hidden;
+      border-radius: 12px;
+    }
+
+    #estado {
+      margin-top: 16px;
+      padding: 12px;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 14px;
+      background: #e7f1ff;
+      color: #084298;
+    }
+
+    .success {
+      background: #d1e7dd !important;
+      color: #0f5132 !important;
+    }
+
+    .error {
+      background: #f8d7da !important;
+      color: #842029 !important;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      margin-top: 14px;
+      border: none;
+      border-radius: 10px;
+      background: #dc3545;
+      color: white;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .codigo {
+      font-family: monospace;
+      font-size: 16px;
+      margin-top: 8px;
+      word-break: break-all;
+    }
+
+  </style>
+</head>
+
+<body>
+
+  <div class="container">
+
+    <div class="card">
+
+      <h1>📷 Escáner QR SCD</h1>
+
+      <div class="subtitle">
+        Apunta la cámara hacia la Credencial Digital SCD
+      </div>
+
+      <div id="qr-reader"></div>
+
+      <div id="estado">
+        Iniciando cámara...
+      </div>
+
+      <button onclick="cerrarScanner()">
+        Cancelar escaneo
+      </button>
+
+    </div>
+
+  </div>
+
+
+<script>
+
+  let html5QrCode = null;
+  let codigoProcesado = false;
+
+
+  document.addEventListener(
+    "DOMContentLoaded",
+    iniciarScanner
+  );
+
+
+  async function iniciarScanner() {
+
+    const estado =
+      document.getElementById("estado");
+
+    try {
+
+      html5QrCode =
+        new Html5Qrcode("qr-reader");
+
+
+      const cameras =
+        await Html5Qrcode.getCameras();
+
+
+      if (!cameras || cameras.length === 0) {
+
+        throw new Error(
+          "No se encontraron cámaras disponibles."
+        );
+
+      }
+
+
+      let cameraId = cameras[0].id;
+
+
+      const camaraTrasera =
+        cameras.find(camera =>
+
+          /back|rear|environment|trasera/i
+            .test(camera.label)
+
+        );
+
+
+      if (camaraTrasera) {
+
+        cameraId = camaraTrasera.id;
+
+      }
+
+      else if (cameras.length > 1) {
+
+        cameraId =
+          cameras[cameras.length - 1].id;
+
+      }
+
+
+      await html5QrCode.start(
+
+        cameraId,
+
+        {
+          fps: 10,
+
+          qrbox: {
+            width: 240,
+            height: 240
+          },
+
+          aspectRatio: 1
+        },
+
+
+        codigoLeido,
+
+
+        () => {}
+
+      );
+
+
+      estado.innerHTML =
+        "✓ Cámara activa. Apunta al código QR.";
+
+      estado.className =
+        "success";
+
+
+    }
+
+    catch (error) {
+
+      console.error(
+        "Error cámara:",
+        error
+      );
+
+
+      estado.innerHTML =
+        "❌ No fue posible iniciar la cámara." +
+        "<br><br>" +
+        "<small>" +
+        escapeHtml(
+          error.name ||
+          error.message ||
+          String(error)
+        ) +
+        "</small>";
+
+      estado.className =
+        "error";
+
+    }
+
+  }
+
+
+
+  async function codigoLeido(
+    decodedText
+  ) {
+
+    if (codigoProcesado) return;
+
+    codigoProcesado = true;
+
+
+    const estado =
+      document.getElementById("estado");
+
+
+    estado.innerHTML =
+      "✓ Código QR detectado" +
+      "<div class='codigo'>" +
+      escapeHtml(decodedText) +
+      "</div>";
+
+    estado.className =
+      "success";
+
+
+    try {
+
+      if (html5QrCode) {
+
+        await html5QrCode.stop();
+
+      }
+
+    }
+
+    catch (error) {
+
+      console.warn(
+        "No fue posible detener cámara:",
+        error
+      );
+
+    }
+
+
+    // En la siguiente etapa enviaremos
+    // decodedText al Portal SCD mediante
+    // window.opener.postMessage().
+
+    console.log(
+      "QR SCD detectado:",
+      decodedText
+    );
+
+  }
+
+
+
+  async function cerrarScanner() {
+
+    try {
+
+      if (html5QrCode) {
+
+        await html5QrCode.stop();
+
+      }
+
+    }
+
+    catch (error) {
+
+      console.warn(error);
+
+    }
+
+
+    window.close();
+
+  }
+
+
+
+  function escapeHtml(text) {
+
+    return String(text || "")
+
+      .replace(/&/g, "&amp;")
+
+      .replace(/</g, "&lt;")
+
+      .replace(/>/g, "&gt;")
+
+      .replace(/"/g, "&quot;");
+
+  }
+
+</script>
+
+</body>
+</html>
