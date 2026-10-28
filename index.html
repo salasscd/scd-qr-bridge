@@ -256,59 +256,124 @@
 
 
 
-  async function codigoLeido(
+  async function codigoLeido(decodedText) {
+
+  if (codigoProcesado) return;
+
+  codigoProcesado = true;
+
+  const estado =
+    document.getElementById("estado");
+
+  estado.innerHTML =
+    "✓ Código QR detectado" +
+    "<div class='codigo'>" +
+    escapeHtml(decodedText) +
+    "</div>" +
+    "<br><small>Enviando al Portal SCD...</small>";
+
+  estado.className =
+    "success";
+
+
+  // Detener cámara después de leer el QR
+  try {
+
+    if (html5QrCode) {
+
+      await html5QrCode.stop();
+
+    }
+
+  }
+
+  catch (error) {
+
+    console.warn(
+      "No fue posible detener cámara:",
+      error
+    );
+
+  }
+
+
+  console.log(
+    "QR SCD detectado:",
     decodedText
-  ) {
-
-    if (codigoProcesado) return;
-
-    codigoProcesado = true;
+  );
 
 
-    const estado =
-      document.getElementById("estado");
-
+  // Verificar que el escáner haya sido abierto
+  // desde otra ventana.
+  if (!window.opener) {
 
     estado.innerHTML =
       "✓ Código QR detectado" +
       "<div class='codigo'>" +
       escapeHtml(decodedText) +
+      "</div>" +
+      "<br><small>" +
+      "Modo de prueba: el escáner fue abierto directamente." +
+      "</small>";
+
+    return;
+
+  }
+
+
+  // Enviar el código QR a la ventana
+  // que abrió el escáner.
+  try {
+
+    window.opener.postMessage(
+      {
+        type: "SCD_QR_SCANNED",
+        qrCode: decodedText
+      },
+      "*"
+    );
+
+
+    estado.innerHTML =
+      "✓ Código enviado al Portal SCD" +
+      "<div class='codigo'>" +
+      escapeHtml(decodedText) +
+      "</div>";
+
+
+    // Cerrar automáticamente el escáner
+    // después de entregar el código.
+    setTimeout(function() {
+
+      window.close();
+
+    }, 500);
+
+
+  }
+
+  catch (error) {
+
+    console.error(
+      "Error enviando QR:",
+      error
+    );
+
+
+    estado.innerHTML =
+      "❌ Se leyó el QR, pero no fue posible " +
+      "enviarlo al Portal SCD." +
+      "<br><br>" +
+      "<div class='codigo'>" +
+      escapeHtml(decodedText) +
       "</div>";
 
     estado.className =
-      "success";
-
-
-    try {
-
-      if (html5QrCode) {
-
-        await html5QrCode.stop();
-
-      }
-
-    }
-
-    catch (error) {
-
-      console.warn(
-        "No fue posible detener cámara:",
-        error
-      );
-
-    }
-
-
-    // En la siguiente etapa enviaremos
-    // decodedText al Portal SCD mediante
-    // window.opener.postMessage().
-
-    console.log(
-      "QR SCD detectado:",
-      decodedText
-    );
+      "error";
 
   }
+
+}
 
 
 
